@@ -43,10 +43,10 @@ def load_model(model_path='yolov8.pt'):
 
 def detect_food(image_path=None,model_path=MODEL_PATH):
 
-    model = load_model(MODEL_PATH)
+    model = load_model(model_path)
 
     # Run inference
-    results = model.predict(source=r'.jpg',**PREDICT_ARGS)
+    results = model.predict(source=image_path,**PREDICT_ARGS)
 
     bounding_boxes = results.boxes.xywh
     scores = results.boxes.conf
