@@ -46,9 +46,9 @@ def detect_food(image_path=None,model_path=MODEL_PATH):
     model = load_model(model_path)
 
     # Run inference
-    results = model.predict(source=image_path,**PREDICT_ARGS)
+    results = model.predict(source=image_path,**PREDICT_ARGS)[0]
 
     bounding_boxes = results.boxes.xywh
     scores = results.boxes.conf
 
-    return bounding_boxes, scores
+    return bounding_boxes.cpu(), scores
