@@ -4,8 +4,7 @@ import os
 from segment_anything import sam_model_registry, SamPredictor
 from segment_anything.utils.transforms import ResizeLongestSide
 from postprocessing import close_mask,open_mask
-from FoodAreaSegmentation.utils import format_bbox
-
+from utils import format_bbox
 
 
 import numpy as np
@@ -101,11 +100,11 @@ def prepare_image_embeddings(image,model_type):
 
     #infere model checkpoint path
     if model_type == "vit_b":
-        sam_checkpoint = os.path.join('.','FoodAreaSegmentation','sam_vit_b_01ec64.pth')
+        sam_checkpoint = os.path.join('.','FoodSegmentation','sam_vit_b_01ec64.pth')
     elif model_type == "vit_l":
-        sam_checkpoint = os.path.join('.','FoodAreaSegmentation','sam_vit_l_0b3195.pth')
+        sam_checkpoint = os.path.join('.','FoodSegmentation','sam_vit_l_0b3195.pth')
     elif model_type == "vit_h":
-        sam_checkpoint = os.path.join('.','FoodAreaSegmentation','sam_vit_h_4b8939.pth')
+        sam_checkpoint = os.path.join('.','FoodSegmentation','sam_vit_h_4b8939.pth')
 
     #Loading SAM predictor
     sam_predictor = LoadSAMPredictor(sam_checkpoint=sam_checkpoint,model_type=model_type,device='cpu')
