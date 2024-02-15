@@ -5,17 +5,19 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 import time
-import json
+import tempfile
 from threading import Thread, Event
 
 # Get the absolute path of the project root directory
 parent_dir = os.path.dirname(os.path.realpath(__file__))
 plate_detection_path = os.path.join(parent_dir,'PlateDetection')
 area_segmentation_path = os.path.join(parent_dir,'FoodSegmentation')
+image_search_path = os.path.join(parent_dir,'ImageSearch')
 
 sys.path.append(parent_dir)
 sys.path.append(plate_detection_path)
 sys.path.append(area_segmentation_path)
+sys.path.append(image_search_path)
 
 # Define variables to store the return values
 bboxes_result = None
@@ -27,9 +29,11 @@ embeddings_done_event = Event()
 packaged_bboxes_done_event = Event()
 
 from FoodSegmentation.sam_model import GenerateMaskForImage,prepare_image_embeddings
-from FoodSegmentation.utils import show_box,show_mask,format_bbox,show_box_cv2,show_mask_cv2
+from FoodSegmentation.utils import format_bbox,show_box_cv2,show_mask_cv2
 
 from FoodDetection.food_detection import detect_food
+
+from ImageSearch.find_neighbors import find_similar_images,init_matching_index_endpoint
 
 from ultralytics.utils.plotting import Annotator, colors, save_one_box
 import argparse
@@ -44,6 +48,14 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
 
 if project_root not in sys.path:
     sys.path.append(project_root)
+
+REGION = 'asia-east1'
+PROJECT_NUMBER = 898528291092
+INDEX_ENDPOINT_ID = '8255379591946829824'
+
+DEPLOYED_INDEX_ID = "matching_test_512_1707923509842"
+
+EMBEDDING_DIMENSION = 512
 
 
 def get_food_masks(sam_predictor,
@@ -90,6 +102,32 @@ def prepare_image_embeddings_worker(image,model_type):
     embeddings_result = prepare_image_embeddings(image,model_type)
     embeddings_done_event.set()
 
+def crop(image, bbox):
+    img_height, img_width, _ = image.shape
+    
+    x, y, w, h = map(int, bbox)  # Convert coordinates to integers
+
+    # Ensure the bounding box is within the bounds of the image
+    x = max(0, min(x, img_width - 1))
+    y = max(0, min(y, img_height - 1))
+    w = max(1, min(w, img_width - x))
+    h = max(1, min(h, img_height - y))
+
+    cropped_image = image[y:y+h, x:x+w]
+    return cropped_image
+
+def save_cropped_image(cropped_image):
+    # Create a temporary directory
+    temp_dir = tempfile.mkdtemp()
+    
+    # Generate a temporary file path
+    temp_file_path = os.path.join(temp_dir, 'cropped_image.jpg')
+    
+    # Save the cropped image to the temporary file
+    cv2.imwrite(temp_file_path, cropped_image)
+    
+    return temp_file_path
+
 
 
 
@@ -133,6 +171,20 @@ def pipeline(opt):
     else : 
         masks = None
         iou = None
+
+    index_endpoint = init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ENDPOINT_ID)
+    food_types=[]
+    for bbox in bboxes:
+        cropped_image = crop(image,bbox)
+        crop_path = save_cropped_image(cropped_image)
+        response = find_similar_images(image_path=crop_path,
+                                    index_endpoint=index_endpoint,
+                                    deployed_index_id=DEPLOYED_INDEX_ID)
+        
+        labels = [neighbor[0].split('\\')[0] for neighbor in response]
+        most_common_label = max(set(labels), key=labels.count)
+        food_types.append(most_common_label)
+
     
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     
@@ -143,9 +195,9 @@ def pipeline(opt):
 
     for i,bbox in enumerate(bboxes):
         if masks:
-            image = show_box_cv2(format_bbox(bbox), image,iou=iou[i][0],category_name='food')
+            image = show_box_cv2(format_bbox(bbox), image,iou=iou[i][0],category_name=food_types[i])
         else:
-            image = show_box_cv2(format_bbox(bbox), image,iou=None,category_name='food')
+            image = show_box_cv2(format_bbox(bbox), image,iou=None,category_name=food_types[i])
 
     if opt["save"]:
         if os.path.exists(r'./PipelineTestResults') == False:
@@ -189,7 +241,7 @@ if __name__ == '__main__':
     opt = {
         "weights": "./Models/best.pt",
         "segmentation_model_type": "vit_b",
-        "source": "2.jpg",
+        "source": "Img_027_0017.png",
         "segment": True,
         "imgsz": (640, 640),
         "conf_thres": 0.25,
