@@ -8,10 +8,14 @@ import time
 from get_embeddings import encode_images_to_embeddings,encode_texts_to_embeddings
 
 REGION = 'asia-east1'
-PROJECT_NUMBER = 0
-INDEX_ID = ''
+PROJECT_NUMBER = 898528291092
+INDEX_ENDPOINT_ID = '8255379591946829824'
 
-DEPLOYED_INDEX_ID = ""
+DEPLOYED_INDEX_ID = "matching_test_512_1707923509842"
+
+EMBEDDING_DIMENSION = 512
+
+
 
 
 def display_similar_images_opencv(input_image_path, response):
@@ -56,7 +60,7 @@ def get_matching_engine_response(index_endpoint, deployed_index_id, image_embedd
 
     return response
 
-def init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ID):
+def init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ENDPOINT_ID):
     index_endpoint = aiplatform.MatchingEngineIndexEndpoint(f'projects/{project_number}/locations/{region}/indexEndpoints/{index_id}')
     return index_endpoint
 
@@ -67,9 +71,9 @@ def find_similar_images(image_path=None,
                         text=None):
 
     if text is None:
-        embeddings = encode_images_to_embeddings(image_uris=[image_path])
+        embeddings = encode_images_to_embeddings(image_uris=[image_path],parameters={"dimension": EMBEDDING_DIMENSION})
     else:
-        embeddings = encode_texts_to_embeddings(text=[text])
+        embeddings = encode_texts_to_embeddings(text=[text],parameters={"dimension": EMBEDDING_DIMENSION})
 
     response = get_matching_engine_response(index_endpoint, deployed_index_id, embeddings, num_neighbors=num_neighbors)
 
@@ -80,18 +84,17 @@ def find_similar_images(image_path=None,
 
 if __name__ == "__main__":
 
-    image_path = r'test\Radish kimchi - Test\2.jpg'
+    image_path = r'.\2.jpg'
 
 
-    index_endpoint = init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ID)
+    index_endpoint = init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ENDPOINT_ID)
     response = find_similar_images(image_path=image_path,
                                    index_endpoint=index_endpoint,
                                    deployed_index_id=DEPLOYED_INDEX_ID)
-
-    print(response)
-
+    labels = [neighbor[0].split('\\')[0] for neighbor in response]
+    print(labels)
+    print(max(set(labels), key=labels.count))
     display_similar_images_opencv(image_path, response)
-
 
 
 
