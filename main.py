@@ -53,9 +53,8 @@ REGION = 'asia-east1'
 PROJECT_NUMBER = 898528291092
 INDEX_ENDPOINT_ID = '8255379591946829824'
 
-DEPLOYED_INDEX_ID = "matching_test_512_1707923509842"
-
-EMBEDDING_DIMENSION = 512
+DEPLOYED_INDEX_ID = "test_5_foods_1708362748643"
+EMBEDDING_DIMENSION = 128
 
 
 def get_food_masks(sam_predictor,
@@ -104,16 +103,9 @@ def prepare_image_embeddings_worker(image,model_type):
 
 def crop(image, bbox):
     img_height, img_width, _ = image.shape
-    
+    #bbox=format_bbox(bbox)
     x, y, w, h = map(int, bbox)  # Convert coordinates to integers
-
-    # Ensure the bounding box is within the bounds of the image
-    x = max(0, min(x, img_width - 1))
-    y = max(0, min(y, img_height - 1))
-    w = max(1, min(w, img_width - x))
-    h = max(1, min(h, img_height - y))
-
-    cropped_image = image[y:y+h, x:x+w]
+    cropped_image = image[y-int(h/2):y+int(h/2),x-int(w/2):x+int(w/2),:]
     return cropped_image
 
 def save_cropped_image(cropped_image):
@@ -174,16 +166,19 @@ def pipeline(opt):
 
     index_endpoint = init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ENDPOINT_ID)
     food_types=[]
-    for bbox in bboxes:
-        cropped_image = crop(image,bbox)
-        crop_path = save_cropped_image(cropped_image)
-        response = find_similar_images(image_path=crop_path,
-                                    index_endpoint=index_endpoint,
-                                    deployed_index_id=DEPLOYED_INDEX_ID)
-        
-        labels = [neighbor[0].split('\\')[0] for neighbor in response]
-        most_common_label = max(set(labels), key=labels.count)
-        food_types.append(most_common_label)
+    if True:
+        for bbox in bboxes:
+            print(bbox)
+            cropped_image = crop(image,bbox)
+            crop_path = save_cropped_image(cropped_image)
+            response = find_similar_images(image_path=crop_path,
+                                        index_endpoint=index_endpoint,
+                                        deployed_index_id=DEPLOYED_INDEX_ID)
+            
+            labels = [neighbor[0].split('\\')[0] for neighbor in response]
+            print(response)
+            most_common_label = max(set(labels), key=labels.count)
+            food_types.append(most_common_label)
 
     
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
@@ -198,13 +193,14 @@ def pipeline(opt):
             image = show_box_cv2(format_bbox(bbox), image,iou=iou[i][0],category_name=food_types[i])
         else:
             image = show_box_cv2(format_bbox(bbox), image,iou=None,category_name=food_types[i])
+            #food_types[i]
 
     if opt["save"]:
         if os.path.exists(r'./PipelineTestResults') == False:
             os.mkdir(r'./PipelineTestResults')
         cv2.imwrite(os.path.join('.','PipelineTestResults',f'test.jpg'), image)
 
-'''
+
     
     #Calculates masks pixel count and returns a dictionnary with surface area for every food {'food_type':pixel_count}
     if masks :
@@ -215,7 +211,6 @@ def pipeline(opt):
         pixel_count_dict = {}
     
     bbox_dict = {}
-    packaged_bbox_dict = {}
 
     # Iterate over each bbox and its corresponding name
     for bbox, name in zip(bboxes, food_types):
@@ -223,17 +218,10 @@ def pipeline(opt):
             bbox_dict[name] = [bbox]
         else: 
             bbox_dict[name].append(bbox)
-
-    # Iterate over each bbox and its corresponding name
-    for bbox, name in zip(packaged_bboxes, packaged_food_types):
-        if name not in packaged_bbox_dict:
-            packaged_bbox_dict[name] = [bbox]
-        else: 
-            packaged_bbox_dict[name].append(bbox)
     
-    return pixel_count_dict,bbox_dict,packaged_bbox_dict,image
-'''
+    return pixel_count_dict,bbox_dict,image
 
+    
 if __name__ == '__main__':
     start_time = time.time()
     
@@ -242,14 +230,14 @@ if __name__ == '__main__':
         "weights": "./Models/best.pt",
         "segmentation_model_type": "vit_b",
         "source": "Img_027_0017.png",
-        "segment": True,
+        "segment": False,
         "imgsz": (640, 640),
-        "conf_thres": 0.25,
+        "conf_thres": 0.2,
         "iou_thres": 0.45,
         "save": True
     }
 
-    pipeline(opt)
+    print(pipeline(opt))
 
     end_time = time.time()
 

@@ -64,8 +64,7 @@ def show_box_cv2(box, image, iou=0, category_name=None):
     image = cv2.rectangle(image, (x0, y0), (x1, y1), (0, 255, 0), 2)
     
     if category_name is not None:
-        cv2.putText(image, category_name, (x0, y0 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-    
+        cv2.putText(image, category_name, (x0, y0 + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
     if iou is not None:
         cv2.putText(image, f'IoU: {iou:.2f}', (x0, y1 + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
     
