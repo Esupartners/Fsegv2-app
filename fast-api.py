@@ -6,6 +6,11 @@ import json
 import base64
 import cv2
 from main import pipeline
+from ImageSearch.find_neighbors import init_matching_index_endpoint
+
+REGION = 'asia-east1'
+PROJECT_NUMBER = 0
+INDEX_ENDPOINT_ID = ''
 
 
 app = FastAPI()
@@ -21,12 +26,15 @@ if not os.path.exists(upload_dir):
 if not os.path.exists(transformed_image_dir):
     os.makedirs(transformed_image_dir)
 
+index_endpoint = init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ENDPOINT_ID)
+
 
 @app.post("/uploadfile/")
 async def upload_file(file: UploadFile):
         # Define Arguments of Food Detection
     OPT = {
         "weights": "./Models/best.pt",
+        "mobile_sam": True,
         "segmentation_model_type": "vit_b",
         "source": os.path.join(upload_dir, file.filename),
         "segment": True,
@@ -45,7 +53,7 @@ async def upload_file(file: UploadFile):
     extension = os.path.splitext(file.filename)[1].removeprefix('.')
     mime_type = f"image/{extension}" 
 
-    pixel_count_dict,bbox_dict,transformed_image = pipeline(OPT)
+    pixel_count_dict,bbox_dict,transformed_image = pipeline(OPT,index_endpoint=index_endpoint)
 
     # Save the transformed image to a temporary location
     transformed_image_path = os.path.join(transformed_image_dir, "transformed_" + file.filename)
