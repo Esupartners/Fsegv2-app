@@ -53,7 +53,7 @@ REGION = 'asia-east1'
 PROJECT_NUMBER = 898528291092
 INDEX_ENDPOINT_ID = '8255379591946829824'
 
-DEPLOYED_INDEX_ID = "test_5_foods_1708362748643"
+DEPLOYED_INDEX_ID = "test_5_foods_1708362748643_1708976525434"
 EMBEDDING_DIMENSION = 128
 
 
@@ -126,7 +126,7 @@ def save_cropped_image(cropped_image):
 
 
 
-def pipeline(opt):
+def pipeline(opt,index_endpoint=None):
 
     image = cv2.imread(opt["source"])
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -168,11 +168,10 @@ def pipeline(opt):
         masks = None
         iou = None
 
-    index_endpoint = init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ENDPOINT_ID)
+    
     food_types=[]
     if True:
         for bbox in bboxes:
-            print(bbox)
             cropped_image = crop(image,bbox)
             crop_path = save_cropped_image(cropped_image)
             response = find_similar_images(image_path=crop_path,
@@ -180,7 +179,6 @@ def pipeline(opt):
                                         deployed_index_id=DEPLOYED_INDEX_ID)
             
             labels = [neighbor[0].split('\\')[0] for neighbor in response]
-            print(response)
             most_common_label = max(set(labels), key=labels.count)
             food_types.append(most_common_label)
 
@@ -218,14 +216,17 @@ def pipeline(opt):
     # Iterate over each bbox and its corresponding name
     for bbox, name in zip(bboxes, food_types):
         if name not in bbox_dict:
-            bbox_dict[name] = [bbox]
+            bbox_dict[name] = list(bbox.numpy())
         else: 
-            bbox_dict[name].append(bbox)
+            bbox_dict[name].append(list(bbox.numpy()))
     
     return pixel_count_dict,bbox_dict,image
 
     
 if __name__ == '__main__':
+
+    index_endpoint = init_matching_index_endpoint(project_number=PROJECT_NUMBER, region=REGION, index_id=INDEX_ENDPOINT_ID)
+
     start_time = time.time()
     
     # Define Arguments of Food Detection
@@ -233,16 +234,16 @@ if __name__ == '__main__':
         "weights": "./Models/best.pt",
         "mobile_sam": True,
         "segmentation_model_type": "vit_b",
-        "source": "Img_030_0001.jpg",
+        "source": r"test_images\2.jpg",
         "segment": True,
         "imgsz": (640, 640),
-        "conf_thres": 0.1,
+        "conf_thres": 0.01,
         "iou_thres": 0.7,
         "save": True
     }
 
-    print(pipeline(opt))
-
+    results = pipeline(opt,index_endpoint=index_endpoint)
+    print(results)
     end_time = time.time()
 
     print('Elapsed time : ', end_time - start_time)
