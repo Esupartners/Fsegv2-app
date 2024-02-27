@@ -6,6 +6,7 @@ from segment_anything.utils.transforms import ResizeLongestSide
 from postprocessing import close_mask,open_mask
 from utils import format_bbox
 
+import mobile_sam
 
 import numpy as np
 import torch
@@ -33,6 +34,27 @@ def LoadSAMPredictor(sam_checkpoint, model_type, device='cuda', return_sam=False
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
     sam.to(device=device)
     predictor = SamPredictor(sam)
+
+    if return_sam :
+        return predictor,sam
+    else : 
+        return predictor
+    
+def LoadMobileSAMPredictor(sam_checkpoint, model_type, device='cuda',return_sam=False):
+    """
+    Load a Segment Anything Model (SAM) predictor model for semantic segmentation.
+
+    Parameters:
+    - sam_checkpoint (str): The path to the checkpoint file containing the SAM model's weights and configuration.
+    - model_type (str): The SAM model type to use. It should be a key that corresponds to a model in the 'sam_model_registry'.
+    - device (str, optional): The device to run the model on, either 'cuda' (GPU) or 'cpu' (CPU). Default is 'cuda'.
+
+    Returns:
+    - predictor (SamPredictor): An instance of the SAM predictor configured with the specified model type and loaded weights.
+    """
+    sam = mobile_sam.sam_model_registry[model_type](checkpoint=sam_checkpoint)
+    sam.to(device=device)
+    predictor = mobile_sam.SamPredictor(sam)
 
     if return_sam :
         return predictor,sam
@@ -114,6 +136,20 @@ def prepare_image_embeddings(image,model_type):
 
     return sam_predictor
 
+def prepare_image_embeddings_mobile_sam(image,model_type="vit_t"):
+
+    #infere model checkpoint path
+    sam_checkpoint = r'FoodSegmentation\mobile_sam.pt'
+
+    #Loading SAM predictor
+    sam_predictor = LoadMobileSAMPredictor(sam_checkpoint=sam_checkpoint,model_type=model_type,device='cpu')
+
+    #Create SAM embeddings for the image
+    sam_predictor.set_image(image)
+    
+
+    return sam_predictor
+
 def GenerateMaskForImage(sam_predictor, bounding_boxes=[],open=False,close=False,kernel_size=None):
 
     masks=[]
@@ -164,6 +200,8 @@ def GenerateMaskForImage(sam_predictor, bounding_boxes=[],open=False,close=False
                 masks.append(mask)
 
     return masks,iou_predictions
+
+
 
 
 

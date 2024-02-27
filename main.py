@@ -28,7 +28,7 @@ bboxes_done_event = Event()
 embeddings_done_event = Event()
 packaged_bboxes_done_event = Event()
 
-from FoodSegmentation.sam_model import GenerateMaskForImage,prepare_image_embeddings
+from FoodSegmentation.sam_model import GenerateMaskForImage,prepare_image_embeddings,prepare_image_embeddings_mobile_sam
 from FoodSegmentation.utils import format_bbox,show_box_cv2,show_mask_cv2
 
 from FoodDetection.food_detection import detect_food
@@ -96,14 +96,16 @@ def get_food_bboxes_worker(opt):
     bboxes_result,_ = detect_food(image_path=opt["source"],model_path=opt["weights"])
     bboxes_done_event.set()
 
-def prepare_image_embeddings_worker(image,model_type):
+def prepare_image_embeddings_worker(image,model_type,mobile_sam):
     global embeddings_result
-    embeddings_result = prepare_image_embeddings(image,model_type)
+    if mobile_sam:
+        embeddings_result = prepare_image_embeddings_mobile_sam(image,"vit_t")
+    else:
+        embeddings_result = prepare_image_embeddings(image,model_type)
     embeddings_done_event.set()
 
 def crop(image, bbox):
     img_height, img_width, _ = image.shape
-    #bbox=format_bbox(bbox)
     x, y, w, h = map(int, bbox)  # Convert coordinates to integers
     cropped_image = image[y-int(h/2):y+int(h/2),x-int(w/2):x+int(w/2),:]
     return cropped_image
@@ -131,7 +133,9 @@ def pipeline(opt):
     # Create two threads to run get_food_bboxes and prepare_image_embeddings concurrently
 
     get_bboxes_thread = Thread(target=get_food_bboxes_worker,args=(opt,))
-    prepare_embeddings_thread = Thread(target=prepare_image_embeddings_worker, args=(image,opt["segmentation_model_type"]))
+    prepare_embeddings_thread = Thread(target=prepare_image_embeddings_worker, args=(image,
+                                                                                     opt["segmentation_model_type"],
+                                                                                     opt["mobile_sam"]))
 
     # Start the threads
     get_bboxes_thread.start()
@@ -193,7 +197,6 @@ def pipeline(opt):
             image = show_box_cv2(format_bbox(bbox), image,iou=iou[i][0],category_name=food_types[i])
         else:
             image = show_box_cv2(format_bbox(bbox), image,iou=None,category_name=food_types[i])
-            #food_types[i]
 
     if opt["save"]:
         if os.path.exists(r'./PipelineTestResults') == False:
@@ -228,12 +231,13 @@ if __name__ == '__main__':
     # Define Arguments of Food Detection
     opt = {
         "weights": "./Models/best.pt",
+        "mobile_sam": True,
         "segmentation_model_type": "vit_b",
-        "source": "Img_027_0017.png",
-        "segment": False,
+        "source": "Img_030_0001.jpg",
+        "segment": True,
         "imgsz": (640, 640),
-        "conf_thres": 0.2,
-        "iou_thres": 0.45,
+        "conf_thres": 0.1,
+        "iou_thres": 0.7,
         "save": True
     }
 
